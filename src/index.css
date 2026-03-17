@@ -1,3 +1,5 @@
+@import 'pdfjs-dist/web/pdf_viewer.css';
+
 :root {
   --bg: #111827;
   --panel: #1f2937;
@@ -37,6 +39,7 @@ a {
 }
 
 .app-shell {
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -107,57 +110,35 @@ a {
   transform: scale(0.96);
 }
 
-
 .viewer-container {
-  height: calc(100% - 56px);
+  position: absolute;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: auto;
+}
+
+/* Center pages within our dark container */
+.pdfViewer {
   padding: 24px 20px 40px;
 }
 
-.viewer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-}
-
-.page {
-  position: relative;
+.pdfViewer .page {
   background: white;
   box-shadow: var(--shadow);
   border-radius: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  overflow: hidden;
-}
-
-.textLayer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  line-height: 1;
-  text-size-adjust: none;
-  forced-color-adjust: none;
-  transform-origin: 0 0;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.textLayer span,
-.textLayer br {
-  color: transparent;
-  position: absolute;
-  white-space: pre;
-  cursor: text;
-  transform-origin: 0% 0%;
-}
-
-.textLayer ::selection {
-  background: rgba(96, 165, 250, 0.3);
-  color: transparent;
 }
 
 .page canvas {
   display: block;
+}
+
+/* Tint annotation links to match our accent color */
+.annotationLayer .linkAnnotation > a:hover {
+  opacity: 0.2;
+  background: var(--accent);
 }
 
 .empty-state {

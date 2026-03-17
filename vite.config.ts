@@ -35,14 +35,52 @@ function leaflePlugin(): Plugin {
           return
         }
 
+        let stat: fs.Stats
+        try {
+          stat = fs.statSync(pdfPath)
+        } catch {
+          res.statusCode = 500
+          res.end('Failed to stat PDF')
+          return
+        }
+
+        const rangeHeader = req.headers['range']
+
         res.setHeader('Cache-Control', 'no-store')
         res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Accept-Ranges', 'bytes')
+
+        if (rangeHeader) {
+          const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader)
+          if (match) {
+            const fileSize = stat.size
+            const start = match[1] ? parseInt(match[1], 10) : 0
+            const end = match[2] ? parseInt(match[2], 10) : fileSize - 1
+            const clampedEnd = Math.min(end, fileSize - 1)
+
+            if (start > clampedEnd || start >= fileSize) {
+              res.statusCode = 416
+              res.setHeader('Content-Range', `bytes */${fileSize}`)
+              res.end()
+              return
+            }
+
+            res.statusCode = 206
+            res.setHeader('Content-Range', `bytes ${start}-${clampedEnd}/${fileSize}`)
+            res.setHeader('Content-Length', String(clampedEnd - start + 1))
+            fs.createReadStream(pdfPath, { start, end: clampedEnd }).pipe(res)
+            return
+          }
+        }
+
+        res.setHeader('Content-Length', String(stat.size))
         fs.createReadStream(pdfPath).pipe(res)
       })
 
       if (!pdfPath) return
 
       let lastMtimeMs = 0
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
       const timer = setInterval(() => {
         fs.stat(pdfPath, (err, stats) => {
@@ -51,17 +89,22 @@ function leaflePlugin(): Plugin {
           if (stats.mtimeMs !== lastMtimeMs) {
             lastMtimeMs = stats.mtimeMs
 
-            server.ws.send({
-              type: 'custom',
-              event: 'leafle:pdf-updated',
-              data: { version: Date.now() },
-            })
+            if (debounceTimer) clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => {
+              debounceTimer = null
+              server.ws.send({
+                type: 'custom',
+                event: 'leafle:pdf-updated',
+                data: { version: Date.now() },
+              })
+            }, 500)
           }
         })
       }, 350)
 
       server.httpServer?.once('close', () => {
         clearInterval(timer)
+        if (debounceTimer) clearTimeout(debounceTimer)
       })
     },
   }
