@@ -76,36 +76,6 @@ function leaflePlugin(): Plugin {
         res.setHeader('Content-Length', String(stat.size))
         fs.createReadStream(pdfPath).pipe(res)
       })
-
-      if (!pdfPath) return
-
-      let lastMtimeMs = 0
-      let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-      const timer = setInterval(() => {
-        fs.stat(pdfPath, (err, stats) => {
-          if (err) return
-
-          if (stats.mtimeMs !== lastMtimeMs) {
-            lastMtimeMs = stats.mtimeMs
-
-            if (debounceTimer) clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(() => {
-              debounceTimer = null
-              server.ws.send({
-                type: 'custom',
-                event: 'leafle:pdf-updated',
-                data: { version: Date.now() },
-              })
-            }, 500)
-          }
-        })
-      }, 350)
-
-      server.httpServer?.once('close', () => {
-        clearInterval(timer)
-        if (debounceTimer) clearTimeout(debounceTimer)
-      })
     },
   }
 }

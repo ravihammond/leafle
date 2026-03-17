@@ -14,6 +14,9 @@ export class LeaflePdfViewer {
   private container!: HTMLDivElement
   private pdfDoc: pdfjsLib.PDFDocumentProxy | null = null
   private loadingTask: pdfjsLib.PDFDocumentLoadingTask | null = null
+  private pendingViewState: SavedViewState | null = null
+
+  onScaleChange?: (scale: number) => void
 
   init(container: HTMLDivElement, viewerDiv: HTMLDivElement) {
     this.container = container
@@ -33,9 +36,23 @@ export class LeaflePdfViewer {
     })
 
     this.linkService.setViewer(this.viewer)
+
+    this.eventBus._on('pagesinit', () => {
+      if (this.pendingViewState) {
+        this.viewer.currentScale = this.pendingViewState.scale
+        this.pendingViewState = null
+      } else {
+        this.viewer.currentScaleValue = 'page-fit'
+      }
+    })
+
+    this.eventBus._on('scalechanging', (e: { scale: number }) => {
+      this.onScaleChange?.(e.scale)
+    })
   }
 
-  async loadDocument(url: string): Promise<void> {
+  async loadDocument(url: string, initialState?: SavedViewState): Promise<void> {
+    this.pendingViewState = initialState ?? null
     // Cancel any in-flight load
     if (this.loadingTask) {
       try {
@@ -62,6 +79,10 @@ export class LeaflePdfViewer {
     }
 
     this.pdfDoc = pdfDoc
+  }
+
+  setScale(scale: number) {
+    this.viewer.currentScale = scale
   }
 
   zoomIn() {

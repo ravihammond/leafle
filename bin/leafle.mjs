@@ -126,7 +126,7 @@ async function main() {
 
     const latexmk = spawn(
       'latexmk',
-      ['-pdf', '-pvc', '-view=none', '-cd', `-outdir=${cacheDir}`, texAbs],
+      ['-pdf', '-view=none', '-cd', `-outdir=${cacheDir}`, texAbs],
       {
         cwd: docDir,
         stdio: ['ignore', stdoutTarget, stderrTarget],
@@ -175,10 +175,42 @@ async function main() {
     }
 
     let shuttingDown = false
+    let isBuilding = false
+    let pendingRebuild = false
+    let rebuildTimer = null
+
+    function runBuild() {
+      if (isBuilding) { pendingRebuild = true; return }
+      isBuilding = true
+      pendingRebuild = false
+
+      const build = spawn(
+        'latexmk',
+        ['-pdf', '-view=none', '-cd', `-outdir=${cacheDir}`, texAbs],
+        { cwd: docDir, stdio: ['ignore', stdoutTarget, stderrTarget] },
+      )
+
+      build.on('exit', (code) => {
+        isBuilding = false
+        if (code === 0) {
+          vite.ws.send({ type: 'custom', event: 'leafle:pdf-updated', data: { version: Date.now() } })
+        }
+        if (pendingRebuild) runBuild()
+      })
+    }
+
+    const watcher = fs.watch(docDir, { recursive: true }, (_, filename) => {
+      if (!filename?.endsWith('.tex')) return
+      clearTimeout(rebuildTimer)
+      rebuildTimer = setTimeout(runBuild, 300)
+    })
 
     const shutdown = async () => {
       if (shuttingDown) return
       shuttingDown = true
+
+      watcher.close()
+      clearTimeout(rebuildTimer)
 
       try {
         latexmk.kill('SIGINT')
@@ -194,21 +226,21 @@ async function main() {
     process.on('SIGINT', shutdown)
     process.on('SIGTERM', shutdown)
 
-    latexmk.on('exit', async (code, signal) => {
+    latexmk.on('exit', (code, signal) => {
       if (shuttingDown) return
-
-      console.error('')
-      console.error('leafle: latexmk stopped unexpectedly')
-      console.error(`  code   ${code ?? 'null'}`)
-      console.error(`  sig    ${signal ?? 'null'}`)
-      if (!verbose) {
-        console.error(`  out    ${stdoutLog}`)
-        console.error(`  err    ${stderrLog}`)
+      // Initial build finished; log non-zero exits but don't exit the process
+      // since the watch loop will handle subsequent builds
+      if (code !== 0) {
+        console.error('')
+        console.error('leafle: initial latexmk build failed')
+        console.error(`  code   ${code ?? 'null'}`)
+        console.error(`  sig    ${signal ?? 'null'}`)
+        if (!verbose) {
+          console.error(`  out    ${stdoutLog}`)
+          console.error(`  err    ${stderrLog}`)
+        }
+        console.error('')
       }
-      console.error('')
-
-      await vite.close()
-      process.exit(code ?? 1)
     })
   } catch (err) {
     console.error(`leafle: ${err.message}`)

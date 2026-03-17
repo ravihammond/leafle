@@ -7,6 +7,7 @@ export function useLeaflePdfViewer(
 ) {
   const controllerRef = useRef<LeaflePdfViewer | null>(null)
   const [hasRendered, setHasRendered] = useState(false)
+  const [scale, setScaleState] = useState(1.0)
 
   useEffect(() => {
     const container = containerRef.current
@@ -15,6 +16,7 @@ export function useLeaflePdfViewer(
 
     const controller = new LeaflePdfViewer()
     controller.init(container, viewerDiv)
+    controller.onScaleChange = (s) => setScaleState(s)
     controllerRef.current = controller
 
     return () => {
@@ -23,17 +25,20 @@ export function useLeaflePdfViewer(
     }
   }, [containerRef, viewerDivRef])
 
-  async function loadDocument(url: string) {
+  async function loadDocument(url: string, initialState?: SavedViewState) {
     const controller = controllerRef.current
     if (!controller) return
 
-    await controller.loadDocument(url)
+    await controller.loadDocument(url, initialState)
+    try {
+      await controller.onePageRendered
+    } catch {
+      // ignore (document replaced before first page rendered)
+    }
+  }
 
-    controller.onePageRendered.then(() => {
-      setHasRendered(true)
-    }).catch(() => {
-      // ignore
-    })
+  function markRendered() {
+    setHasRendered(true)
   }
 
   function captureViewState(): SavedViewState | null {
@@ -56,5 +61,9 @@ export function useLeaflePdfViewer(
     controllerRef.current?.fitWidth()
   }
 
-  return { loadDocument, captureViewState, restoreViewState, zoomIn, zoomOut, fitWidth, hasRendered }
+  function setScale(value: number) {
+    controllerRef.current?.setScale(value)
+  }
+
+  return { loadDocument, markRendered, captureViewState, restoreViewState, zoomIn, zoomOut, fitWidth, hasRendered, scale, setScale }
 }
