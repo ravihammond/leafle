@@ -36,7 +36,7 @@ export default function App() {
     fetch('/api/meta', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        setFileLabel(data.mainTex ?? 'Unknown.tex')
+        setFileLabel(data.title?.trim() || data.mainTex || 'Unknown.tex')
       })
       .catch(() => {
         setFileLabel('Unknown.tex')
@@ -97,6 +97,13 @@ export default function App() {
       if (state) {
         restoreViewState(state)
       }
+      // Re-fetch title in case \title{} changed
+      fetch('/api/meta', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          setFileLabel(data.title?.trim() || data.mainTex || 'Unknown.tex')
+        })
+        .catch(() => {})
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -3,6 +3,41 @@ import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import path from 'node:path'
 
+function stripLatex(src: string): string {
+  let s = src
+  s = s.replace(/\\\\/g, ' ')           // \\ → space (line break)
+  s = s.replace(/~/g, ' ')              // ~ → space (non-breaking space)
+  // Iteratively unwrap \cmd{content} → content (handles arbitrary nesting depth)
+  let prev = ''
+  while (prev !== s) {
+    prev = s
+    s = s.replace(/\\[a-zA-Z]+\*?\{([^{}]*)\}/g, '$1')
+  }
+  s = s.replace(/\\[a-zA-Z]+\*?/g, '') // remove bare \commands
+  s = s.replace(/[{}]/g, '')            // remove stray braces
+  return s.replace(/\s+/g, ' ').trim()  // normalize whitespace
+}
+
+function extractLatexTitle(texPath: string): string {
+  try {
+    const src = fs.readFileSync(texPath, 'utf8')
+    const cmdMatch = /\\title(?:\[[^\]]*\])?\{/.exec(src)
+    if (!cmdMatch) return ''
+    const braceStart = cmdMatch.index + cmdMatch[0].length - 1  // index of opening {
+    let depth = 0
+    let i = braceStart
+    while (i < src.length) {
+      if (src[i] === '{') depth++
+      else if (src[i] === '}') { depth--; if (depth === 0) break }
+      i++
+    }
+    const raw = src.slice(braceStart + 1, i)
+    return stripLatex(raw)
+  } catch {
+    return ''
+  }
+}
+
 function leaflePlugin(): Plugin {
   return {
     name: 'leafle-plugin',
@@ -21,6 +56,7 @@ function leaflePlugin(): Plugin {
           JSON.stringify({
             mainTex,
             pdfName,
+            title: extractLatexTitle(mainTex),
           }),
         )
       })

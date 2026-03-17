@@ -1,6 +1,7 @@
 @import 'pdfjs-dist/web/pdf_viewer.css';
 
 :root {
+  --toolbar-height: 50px;
   --bg: #263348;
   --panel: #1f2937;
   --panel-2: #374151;
@@ -45,7 +46,7 @@ a {
 }
 
 .toolbar {
-  height: 56px;
+  height: var(--toolbar-height);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -53,8 +54,8 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  border-bottom: 1px solid var(--border);
   background: var(--panel);
+  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .toolbar-left,
@@ -75,8 +76,8 @@ a {
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
 }
 
 .toolbar-sep {
@@ -120,7 +121,7 @@ a {
 
 .viewer-container {
   position: absolute;
-  top: 56px;
+  top: var(--toolbar-height);
   left: 0;
   right: 0;
   bottom: 0;
@@ -129,7 +130,7 @@ a {
 
 /* Center pages within our dark container */
 .pdfViewer {
-  padding: 24px 20px 40px;
+  padding: 24px 20px;
 }
 
 .pdfViewer .page {
